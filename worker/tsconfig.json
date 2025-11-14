@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "es2022",
+    "lib": ["esnext", "webworker"],
+    "types": ["@cloudflare/workers-types"],
+    "noEmit": true,
+    "allowImportingTsExtensions": false
+  },
+  "include": ["worker.ts"]
+}
+

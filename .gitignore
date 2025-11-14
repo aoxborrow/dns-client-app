@@ -1,0 +1,9 @@
+node_modules
+dist
+client/dist
+.DS_Store
+vite.config.ts.*
+*.tar.gz
+shared/*.js
+.wrangler
+.vscode

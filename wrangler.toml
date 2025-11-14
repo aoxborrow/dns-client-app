@@ -1,0 +1,10 @@
+name = "dns-client-app"
+main = "dist/worker.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat_v2"]
+
+assets = { directory = "client/dist" }
+
+[build]
+command = "npm run build"
+
