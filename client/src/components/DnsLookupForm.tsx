@@ -15,8 +15,8 @@ import { Switch } from "@/components/ui/switch";
 import { Search } from "lucide-react";
 
 const NAMESERVERS = [
-  { value: "1.1.1.1", label: "Cloudflare (1.1.1.1)" },
   { value: "8.8.8.8", label: "Google (8.8.8.8)" },
+  // { value: "1.1.1.1", label: "Cloudflare (1.1.1.1)" },
   { value: "9.9.9.9", label: "Quad9 (9.9.9.9)" },
   { value: "208.67.222.222", label: "OpenDNS (208.67.222.222)" },
   { value: "authoritative", label: "Authoritative (Root Servers)" },
@@ -80,7 +80,7 @@ interface DnsLookupFormProps {
 
 export default function DnsLookupForm({ onLookup, isLoading = false }: DnsLookupFormProps) {
   const [domain, setDomain] = useState("");
-  const [nameserver, setNameserver] = useState("1.1.1.1");
+  const [nameserver, setNameserver] = useState("8.8.8.8");
   const [customNameserver, setCustomNameserver] = useState("");
   const [selectedTypes, setSelectedTypes] = useState<string[]>(
     RECORD_TYPES.filter((t) => t.popular).map((t) => t.id)

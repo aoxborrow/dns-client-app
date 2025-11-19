@@ -1,5 +1,5 @@
 import type { ExecutionContext } from "@cloudflare/workers-types";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import {
   DnsClient,
   flattenRecords,
@@ -14,6 +14,20 @@ import { Buffer as BufferPolyfill } from "buffer";
 if (typeof (globalThis as any).Buffer === "undefined") {
   (globalThis as any).Buffer = BufferPolyfill;
 }
+
+// Add base64url encoding support to Buffer (needed for DoH)
+const originalToString = BufferPolyfill.prototype.toString;
+BufferPolyfill.prototype.toString = function (
+  encoding?: any,
+  start?: number,
+  end?: number
+): string {
+  if (encoding === "base64url") {
+    const base64 = originalToString.call(this, "base64", start, end);
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+  }
+  return originalToString.call(this, encoding, start, end);
+};
 
 export interface Env {
   ASSETS: {
@@ -34,7 +48,7 @@ type DnsQuery = z.infer<typeof dnsQuerySchema>;
 
 // DNS Client
 const DOH_SERVERS: Record<string, string> = {
-  "1.1.1.1": "https://cloudflare-dns.com/dns-query",
+  // "1.1.1.1": "https://cloudflare-dns.com/dns-query",
   "8.8.8.8": "https://dns.google/dns-query",
   "9.9.9.9": "https://dns.quad9.net/dns-query",
   "208.67.222.222": "https://doh.opendns.com/dns-query",
@@ -58,10 +72,15 @@ async function performLookup(query: DnsQuery): Promise<LookupResult> {
     ? ((isAuthoritative ? ["DO"] : ["RD", "DO"]) as DnsQueryFlag[])
     : ((isAuthoritative ? [] : ["RD"]) as DnsQueryFlag[]);
 
-  // Resolve server for DoH
+  // Resolve server
   let server: string | undefined;
   if (!isAuthoritative) {
-    server = transport === "doh" ? DOH_SERVERS[nameserver] || nameserver : nameserver;
+    if (transport === "doh") {
+      // For DoH, only use known DoH servers or if the nameserver is already a URL
+      server = DOH_SERVERS[nameserver] || (nameserver.startsWith("http") ? nameserver : undefined);
+    } else {
+      server = nameserver;
+    }
   }
 
   const client = new DnsClient({
@@ -80,6 +99,12 @@ async function performLookup(query: DnsQuery): Promise<LookupResult> {
   const startTime = Date.now();
   const answers = await client.query({ query: domain, types: typesToQuery });
   const queryTime = Date.now() - startTime;
+
+  // Check for errors in answers
+  const errorAnswer = answers.find((answer) => answer.error);
+  if (errorAnswer?.error) {
+    throw errorAnswer.error;
+  }
 
   return {
     records: answers.flatMap((answer) => flattenRecords(answer.records)),
@@ -107,6 +132,15 @@ export default {
           return Response.json(lookupResult);
         } catch (error) {
           console.error("DNS lookup error:", error);
+
+          if (error instanceof ZodError) {
+            console.log(`${request.method} ${url.pathname} 400`);
+            return Response.json(
+              { error: "Validation error", message: "Invalid request parameters." },
+              { status: 400 }
+            );
+          }
+
           const message = error instanceof Error ? error.message : "An unexpected error occurred";
           console.log(`${request.method} ${url.pathname} 500`);
           return Response.json({ error: "DNS lookup failed", message }, { status: 500 });
